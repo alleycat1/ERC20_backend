@@ -1,0 +1,82 @@
+const express = require("express");
+const solc = require('solc');
+const fs = require('fs');
+const Web3 = require('web3');
+const EthereumTx = require('ethereumjs-tx').Transaction;
+var cors = require('cors')
+const bodyParser = require("body-parser");
+
+const app = express();
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
+app.use(express.json());
+
+app.listen(4000,() => console.log("Server listening at port 4000"));
+
+app.post("/compile", (req, resp, next) => {
+    const { tokenName, tokenSymbol, tokenSupply, tokenDecimal } = req.body;
+    fs.readFile('my_token.sol', 'utf8', (err, data) => { 
+        const input = {
+            language: "Solidity",
+            sources:{
+                "MyTokenERC20.sol":{
+                    content: data
+                },
+            },
+            settings: {
+                outputSelection: {
+                    '*': {
+                        '*': ['*'],
+                    },
+                },
+            },
+        };
+        const output = JSON.parse(solc.compile(JSON.stringify(input)));
+        if (output.errors) {
+            output.errors.forEach((err) => {
+                console.error(err.formattedMessage);
+            });
+            resp.send({status:"Failed", error:"Compile error"});
+        } else {
+            const contracts = output.contracts["MyTokenERC20.sol"];
+            for (let contractName in contracts) {
+                const contract = contracts[contractName];
+
+                const bytecode = "0x" + contract.evm.bytecode.object;
+                const abi = contract.abi;
+                
+                const privKey = 'private key';
+                const address = 'public key'; //0x98100ECC2745E6FF286dE4E306026AfB4C6494c8
+                const web3 = new Web3("https://ethereum-goerli.publicnode.com");
+                const deploy = async() => {
+                    console.log('Attempting to deploy from account:', address);
+                    const incrementer = new web3.eth.Contract(abi);
+                    const incrementerTx = incrementer.deploy({
+                        data: bytecode,
+                        arguments: [tokenName, tokenSymbol, tokenSupply, tokenDecimal],
+                    })
+                    try{
+                        var nonce = await web3.eth.getTransactionCount (address);
+                        const createTransaction = await web3.eth.accounts.signTransaction({
+                                nonce: web3.utils.toHex (nonce),
+                                from: address,
+                                data: incrementerTx.encodeABI(),
+                                gas: 3000000,
+                            },
+                            privKey
+                        )
+                        const createReceipt = web3.eth.sendSignedTransaction(createTransaction.rawTransaction).then((res) => {
+                            console.log('Contract deployed at address', res.contractAddress);
+                            resp.send({status:"Success", address:res.contractAddress});
+                        });
+                    } catch(e){
+                        console.log(e);
+                        resp.send({status:"Failed", error:"Deploy Error"});
+                    }
+                };
+                deploy();
+            }
+        }
+    });
+});

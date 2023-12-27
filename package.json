@@ -1,0 +1,21 @@
+{
+  "name": "token_deployer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node ./app.js",
+    "dev": "nodemon ./app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "ethereumjs-tx": "^2.1.2",
+    "express": "^4.18.2",
+    "join": "^3.0.0",
+    "solc": "^0.8.23-fixed",
+    "web3": "1.2.4"
+  }
+}
